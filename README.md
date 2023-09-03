@@ -1,5 +1,4 @@
 
-
 ## Prerequisites
 - Your favourite text editor, such as [VSCode](https://code.visualstudio.com/), [Sublime Text](https://www.sublimetext.com/), etc.
 - [Docker](https://www.docker.com/) installed, for creating build environment inside a container.
@@ -18,7 +17,7 @@ Remember that instead of `build_env`, you can provide a name of any other folder
 First of all, you need to enter your build environment:
 - Linux/MacOS: `docker run --rm -it --volume "$(pwd)":/root/env calypso-build_env`
 - Windows (CMD): `docker run --rm -it --volume "%cd%":/root/env calypso-build_env`
-- Windows (PowerShell): `docker run --rm -it --volume "${pwd}":/root/env calypso-build_env`
+- Windows (PowerShell): `docker run --rm -it --volume "${pwd}:/root/env" calypso-build_env`
 
 > **Note**
 > To leave build environment, type "exit".
