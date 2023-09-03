@@ -9,6 +9,11 @@
     ; We'll put it's code to a READ-ONLY SEGMENT
     section .rodata
 
+    global GDT64_start
+    global GDT64_start.GDT64_code
+
+    global GDT64_descriptor
+
 ; Here is the beginning of our GDT64
 
 ; WARNING: DON'T REMOVE THIS LABEL
@@ -18,12 +23,10 @@ GDT64_start:
     dq 0x0000000000000000
 
     ; The next one is a CODE segment
-.GDT64_code:
-    dq 0x00CF9A0000000000
+.GDT64_code: equ $ - GDT64_start
+    dq (1 << 43) | (1 << 44) | (1 << 47) | (1 << 53)
 
     ; And the last one for now is a DATA segment
-.GDT64_data:
-    dq 0x00CF920000000000
 
 ; After that, we'll also create a label pointing to the end of our GDT
 

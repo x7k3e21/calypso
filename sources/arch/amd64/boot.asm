@@ -2,24 +2,13 @@
     ; This code will be running in Protected Mode (32-bit)
     [bits 32]
 
-<<<<<<< HEAD
-    ; Making entry point of our bootloader available for linker
-    ; This is the point where booting process will start executing
-    global _bootloader_entry
-=======
-    %include "gdt/gdt64.asm"
->>>>>>> cfcf563177c2c1a39abc129536363fbab0674bfc
-
     ; Declaring TEXT section, where we will put our instructions
     section .text
 
-<<<<<<< HEAD
-=======
     ; Making entry point of our bootloader available for linker
     ; This is the point where booting process will start executing
     global _bootloader_entry
 
->>>>>>> cfcf563177c2c1a39abc129536363fbab0674bfc
 ; After that we can create our start label
 ; Where our code will begin executing
 _bootloader_entry:
@@ -27,25 +16,38 @@ _bootloader_entry:
     ; By setting ESP register to the top of the stack
     mov esp, stack_top
 
-    call long_mode.handle_multiboot2
-    call long_mode.handle_cpuid
-    call long_mode.handle_long_mode
+    call _lm_bootloader.verify_multiboot2
+    call _lm_bootloader.verify_cpuid
+    call _lm_bootloader.verify_longmode
 
-    ; And the next step is to run our main function
-    ; This function is declared under sources/kernel/main.c
-    extern kernel_entry
-    call kernel_entry
+    mov ebx, STATUS_MESSAGE_SUCCESS
+
+    call _print_message.begin
+
+    call _setup_page_tables
+    call _enable_paging
+
+    extern GDT64_descriptor
+    lgdt [GDT64_descriptor]
+
+    extern _lm_bootloader_entry
+
+    extern GDT64_start.GDT64_code
+    jmp GDT64_start.GDT64_code:_lm_bootloader_entry
 
     ; This instruction halts our CPU
     ; To prevent executing undefined code
     hlt
 
-long_mode.handle_multiboot2:
-    cmp eax, 0x36D76289
-    jne long_mode.multiboot2_failed
+%define MULTIBOOT2_MAGIC 0x36D76289
+
+_lm_bootloader.verify_multiboot2:
+    cmp eax, MULTIBOOT2_MAGIC
+    jne _lm_bootloader.failed_multiboot2
+
     ret
 
-long_mode.handle_cpuid:
+_lm_bootloader.verify_cpuid:
     pushfd
     pushfd
     xor dword [esp], 1 << 21
@@ -55,68 +57,123 @@ long_mode.handle_cpuid:
     xor eax, [esp]
     popfd 
     and eax, 1 << 21
-    jz long_mode.cpuid_failed
+    jz _lm_bootloader.failed_cpuid
+
     ret
 
-long_mode.handle_long_mode:
+_lm_bootloader.verify_longmode:
     mov eax, 0x80000000
     cpuid
     cmp eax, 0x80000001
-    jb long_mode.long_mode_failed
+
+    jb _lm_bootloader.failed_longmode
 
     mov eax, 0x80000001
     cpuid
     test edx, 1 << 29
-    jz long_mode.long_mode_failed
+
+    jb _lm_bootloader.failed_longmode
 
     ret
 
+ERROR_MESSAGE_MULTIBOOT2 db "ERROR: Unable to verify Multiboot2 signature!", 0
+ERROR_MESSAGE_CPUID db "ERROR: CPU does not support CPUID instruction!", 0
+ERROR_MESSAGE_LONGMODE db "ERROR: CPU does not support 64-bit mode!", 0
 
-long_mode.multiboot2_failed:
-    mov bl, "M"
-    jmp long_mode.print_error
+STATUS_MESSAGE_SUCCESS db "Successfully booted on x86_64!", 0
 
-long_mode.cpuid_failed:
-    mov bl, "C"
-    jmp long_mode.print_error
+_lm_bootloader.failed_multiboot2:
+    mov ebx, ERROR_MESSAGE_MULTIBOOT2
+    jmp _print_message.begin
 
-long_mode.long_mode_failed:
-    mov bl, "L"
-    jmp long_mode.print_error
+_lm_bootloader.failed_cpuid:
+    mov ebx, ERROR_MESSAGE_CPUID
+    jmp _print_message.begin
 
+_lm_bootloader.failed_longmode:
+    mov ebx, ERROR_MESSAGE_LONGMODE
+    jmp _print_message.begin
 
-long_mode.print_error:
-    mov al, "E"
-    mov ah, 0x0f
+%define VIDEO_MEMORY_ADDRESS 0xB8000
 
-    mov [0xB8000], ax
+_print_message.begin:
+    pusha
+    mov edx, VIDEO_MEMORY_ADDRESS
 
-    mov al, "r"
-    mov ah, 0x0f
+    jmp _print_message.loop
 
-    mov [0xB8002], ax
-    mov [0xB8004], ax
+_print_message.loop:
+    mov al, [ebx]
+    mov ah, 0x0F
 
-    mov al, "o"
-    mov ah, 0x0f
+    cmp al, 0
+    je _print_message.end
 
-    mov [0xB8006], ax
+    mov [edx], ax
+    add ebx, 1
+    add edx, 2 
 
-    mov al, "r"
-    mov ah, 0x0f
+    jmp _print_message.loop
 
-    mov [0xB8008], ax
+_print_message.end:
+    popa
 
-    mov al, ":"
-    mov ah, 0x0f
+    ret
 
-    mov [0xB8010], ax
-    mov [0xB8014], bx
+_setup_page_tables:
+    mov eax, _page_table_l3
+    or eax, 0b11
+    mov [_page_table_l4], eax
 
-    hlt
+    mov eax, _page_table_l2
+    or eax, 0b11
+    mov [_page_table_l3], eax
+
+    mov ecx, 0
+
+_setup_page_tables.loop:
+    mov eax, 0x200000
+    mul ecx
+    or eax, 0b10000011
+
+    mov [_page_table_l2 + ecx * 8], eax
+
+    inc ecx
+    cmp ecx, 512
+    jne _setup_page_tables.loop
+
+    ret
+
+_enable_paging:
+    mov eax, _page_table_l4
+    mov cr3, eax
+
+    mov eax, cr4
+    or eax, 1 << 5
+    mov cr4, eax
+
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 1 << 8
+    wrmsr
+
+    mov eax, cr0
+    or eax, 1 << 31
+    mov cr0, eax
+
+    ret
 
     ; Declaring BSS section for uninitialized data
     section .bss
+
+    align 4096
+
+_page_table_l4:
+    resb 4096
+_page_table_l3:
+    resb 4096
+_page_table_l2:
+    resb 4096
 
     ; This code will be aligned on 16-byte boundary
     align 16
