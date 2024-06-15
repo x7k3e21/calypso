@@ -1,0 +1,3 @@
+[submodule "build_env"]
+	path = build_env
+	url = https://github.com/x7k3e21/calypso-build_env

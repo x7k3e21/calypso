@@ -1,0 +1,7 @@
+
+%ifndef MULTIBOOT_MULTIBOOT_H
+%define MULTIBOOT_MULTIBOOT_H
+
+
+
+%endif
