@@ -1,0 +1,6 @@
+
+# Excluding 'build' folder
+/build/amd64
+
+# Excluding 'release' folder
+release/amd64
