@@ -1,0 +1,3 @@
+
+# Excluding kernel binary file
+boot/calypso-amd64.bin
